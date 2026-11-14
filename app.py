@@ -1,22 +1,57 @@
-# app.py  —  DeliverIQ · Urban Delivery Route Optimiser
-# Streamlit inference interface
-# Flow: Input form → predict() → display
+# app.py  —  DeliverIQ · Delivery ETA Predictor
+# Streamlit shell around one custom component (frontend/) that draws the whole UI.
+# Flow: component sends inputs → build_input_df() → predict() → result back to component
 
 import json
 import pickle
 import numpy as np
 import pandas as pd
 import streamlit as st
-import plotly.express as px
+import streamlit.components.v1 as components
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────
-# 0.  Page config
+# 0.  Page config + chrome
 # ─────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="DeliverIQ — Travel Time Predictor",
+    page_title="DeliverIQ — Delivery ETA Predictor",
     page_icon="🚚",
     layout="wide",
+)
+
+# Hide Streamlit's own header, footer, sidebar and menu so the component is the
+# page. Selectors cover both the older class names and the newer data-testids.
+st.markdown(
+    """
+    <style>
+    header[data-testid="stHeader"], [data-testid="stToolbar"],
+    [data-testid="stDecoration"], [data-testid="stStatusWidget"],
+    [data-testid="stSidebar"], [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"], #MainMenu, footer {
+        display: none !important;
+    }
+    html, body, .stApp, [data-testid="stAppViewContainer"],
+    [data-testid="stMain"], section.main {
+        background: #0B1220 !important;
+    }
+    .block-container, [data-testid="stAppViewBlockContainer"],
+    [data-testid="stMainBlockContainer"] {
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+    [data-testid="stVerticalBlock"] { gap: 0 !important; }
+    .element-container:has(style),
+    [data-testid="stElementContainer"]:has(style) { display: none !important; }
+    .stApp iframe { display: block; width: 100%; border: 0; }
+    /* Keep the UI at full opacity while a prediction reruns the script. */
+    .element-container, [data-testid="stElementContainer"] {
+        opacity: 1 !important;
+        transition: none !important;
+    }
+    [data-testid="stSpinner"], .stSpinner { padding: 24px; color: #B4C0D6; }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -66,8 +101,9 @@ USE_LOG_TRANSFORM: bool = metrics.get("log_transform", True)
 # 2.  Helper — build_input_df  (mirrors src/predict.py)
 # ─────────────────────────────────────────────────────────────
 # Lookup tables used to derive hidden numeric features from
-# the user's categorical selections (per src_module_reference)
-_AVG_SPEED = {"low": 20.0, "medium": 35.0, "high": 60.0}
+# the user's categorical selections (per src_module_reference).
+# Low traffic means free-flowing roads, so it maps to the highest speed.
+_AVG_SPEED = {"low": 60.0, "medium": 35.0, "high": 20.0}
 _VISIBILITY = {"clear": 10.0, "rain": 4.0, "fog": 1.5}
 
 
@@ -124,230 +160,98 @@ def predict(pipeline, input_df: pd.DataFrame, use_log_transform: bool = False) -
 
 
 # ─────────────────────────────────────────────────────────────
-# 4.  Sidebar — model card & metrics
+# 4.  Input validation
 # ─────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.image("https://img.icons8.com/color/96/delivery-truck.png", width=64)
-    st.title("DeliverIQ")
-    st.caption("Urban Delivery Route Optimiser — ML Sprint 5")
-    st.divider()
+# The component only ever sends values inside these bounds; anything else did
+# not come from the UI and is dropped before it reaches the model.
+_NUMERIC_BOUNDS = {
+    "distance_km":   (float, 1.0, 100.0),
+    "num_lanes":     (int,   1,   8),
+    "num_signals":   (int,   0,   30),
+    "hour":          (int,   0,   23),
+    "day_of_week":   (int,   0,   6),
+    "temperature_c": (float, -5.0, 50.0),
+}
+_CHOICES = {
+    "traffic_level": tuple(_AVG_SPEED),
+    "road_type":     ("highway", "urban", "residential"),
+    "weather_type":  tuple(_VISIBILITY),
+}
 
-    st.subheader("📊 Model Card")
-    st.markdown(f"**Model:** `{metrics.get('model_name', 'RandomForestRegressor')}`")
-    st.markdown(f"**Train rows:** {metrics.get('training_rows', 0):,}")
-    st.markdown(f"**Test rows:** {metrics.get('test_rows', 0):,}")
-    st.markdown(f"**Log-transform:** `{'Yes' if USE_LOG_TRANSFORM else 'No'}`")
 
-    st.divider()
-    st.subheader("📈 Test-Set Metrics")
-
-    col_m1, col_m2 = st.columns(2)
-    col_m1.metric("MAE",  f"{metrics.get('MAE',  0):.2f} min")
-    col_m2.metric("RMSE", f"{metrics.get('RMSE', 0):.2f} min")
-    col_m1.metric("R²",   f"{metrics.get('R2',   0):.4f}")
-    col_m2.metric("MAPE", f"{metrics.get('MAPE', 0):.2f}%")
-
-    st.divider()
-    st.subheader("🏆 Baseline Comparison")
-    baseline_mae   = metrics.get("baseline_MAE", 0)
-    improvement    = metrics.get("improvement_pct", 0)
-    st.metric(
-        "Baseline MAE",
-        f"{baseline_mae:.2f} min",
-        delta=f"−{improvement:.1f}% vs baseline",
-        delta_color="inverse",
-    )
-
-    st.divider()
-    st.subheader("⚙️ Best Params")
-    best_params = metrics.get("best_params", {})
-    if best_params:
-        params_df = pd.DataFrame(
-            best_params.items(), columns=["Parameter", "Value"]
-        )
-        st.dataframe(params_df, use_container_width=True, hide_index=True)
-    else:
-        st.caption("No hyperparameter info saved.")
+def clean_inputs(raw) -> dict | None:
+    """Return the nine inputs with native types, or None if any is invalid."""
+    if not isinstance(raw, dict):
+        return None
+    cleaned = {}
+    for name, (kind, low, high) in _NUMERIC_BOUNDS.items():
+        value = raw.get(name)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        if not np.isfinite(value) or not low <= value <= high:
+            return None
+        if kind is int and value != int(value):
+            return None
+        cleaned[name] = kind(value)
+    for name, options in _CHOICES.items():
+        if raw.get(name) not in options:
+            return None
+        cleaned[name] = raw[name]
+    return cleaned
 
 
 # ─────────────────────────────────────────────────────────────
-# 5.  Main — title
+# 5.  UI component  (frontend/ — both screens)
 # ─────────────────────────────────────────────────────────────
-st.title("🚚 DeliverIQ — Travel Time Predictor")
-st.markdown(
-    "Fill in the route details below and click **Predict Travel Time** "
-    "to get an estimated delivery duration in minutes."
+_UI_KEY = "deliveriq_ui"
+_RESULT_KEY = "deliveriq_result"      # last prediction, sent back to the component
+_HANDLED_KEY = "deliveriq_handled"    # request_id of the last value acted on
+
+deliveriq_ui = components.declare_component(
+    _UI_KEY, path=str(Path(__file__).parent / "frontend")
 )
-st.divider()
 
 
-# ─────────────────────────────────────────────────────────────
-# 6.  Input form
-# ─────────────────────────────────────────────────────────────
-with st.form("prediction_form"):
-    st.subheader("🗺️ Route Details")
+def handle_request(value) -> bool:
+    """
+    Run the model for a {request_id, inputs} value the component sent.
+    Returns True when a new prediction was stored in session state.
+    Inputs are used for this one call and are not stored or logged.
+    """
+    if not isinstance(value, dict):
+        return False
+    request_id = value.get("request_id")
+    if not isinstance(request_id, str) or request_id == st.session_state.get(_HANDLED_KEY):
+        return False
+    st.session_state[_HANDLED_KEY] = request_id
 
-    col1, col2, col3 = st.columns(3)
+    inputs = clean_inputs(value.get("inputs"))
+    if inputs is None:
+        return False
 
-    with col1:
-        distance_km = st.slider(
-            "Distance (km)",
-            min_value=1.0, max_value=100.0, value=15.0, step=0.5,
-            help="Origin-to-destination straight-line distance.",
-        )
-        num_lanes = st.slider(
-            "Number of Lanes",
-            min_value=1, max_value=8, value=2,
-            help="Lane count on the primary road segment.",
-        )
-        num_signals = st.slider(
-            "Number of Signals",
-            min_value=0, max_value=30, value=5,
-            help="Traffic signals along the route.",
-        )
-
-    with col2:
-        road_type = st.selectbox(
-            "Road Type",
-            options=["highway", "urban", "residential"],
-            index=1,
-            help="Dominant road type on the route.",
-        )
-        traffic_level = st.selectbox(
-            "Traffic Level",
-            options=["low", "medium", "high"],
-            index=1,
-            help=(
-                "Observed congestion level.\n\n"
-                "Avg speed derived: low=60 km/h · medium=35 km/h · high=20 km/h"
-            ),
-        )
-        weather_type = st.selectbox(
-            "Weather Condition",
-            options=["clear", "rain", "fog"],
-            index=0,
-            help=(
-                "Current weather along the route.\n\n"
-                "Visibility derived: clear=10 km · rain=4 km · fog=1.5 km"
-            ),
-        )
-
-    with col3:
-        hour = st.slider(
-            "Departure Hour (24h)",
-            min_value=0, max_value=23, value=9,
-            help="Hour of departure (0 = midnight, 17 = 5 PM).",
-        )
-        day_of_week = st.selectbox(
-            "Day of Week",
-            options=["Monday", "Tuesday", "Wednesday", "Thursday",
-                     "Friday", "Saturday", "Sunday"],
-            index=0,
-            help="Mon–Fri = weekday (0–4) · Sat–Sun = weekend (5–6).",
-        )
-        temperature_c = st.slider(
-            "Temperature (°C)",
-            min_value=-5.0, max_value=50.0, value=28.0, step=0.5,
-            help="Ambient temperature. Default 28°C (typical Delhi).",
-        )
-
-    st.divider()
-
-    # Derived info badges (read-only, shown before submit)
-    dow_num = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].index(day_of_week)
-    is_rush  = hour in (7, 8, 17, 18)
-    is_wkend = dow_num >= 5
-    avg_spd  = _AVG_SPEED[traffic_level]
-    vis_km   = _VISIBILITY[weather_type]
-
-    badge_cols = st.columns(4)
-    badge_cols[0].info(f"🕐 {'Rush hour' if is_rush else 'Off-peak'}")
-    badge_cols[1].info(f"📅 {'Weekend' if is_wkend else 'Weekday'}")
-    badge_cols[2].info(f"🚗 Avg speed: **{avg_spd:.0f} km/h**")
-    badge_cols[3].info(f"👁️ Visibility: **{vis_km:.1f} km**")
-
-    submitted = st.form_submit_button(
-        "🔮 Predict Travel Time", use_container_width=True, type="primary"
-    )
-
-
-# ─────────────────────────────────────────────────────────────
-# 7.  Prediction & display
-# ─────────────────────────────────────────────────────────────
-if submitted:
-    user_inputs = {
-        "distance_km":   distance_km,
-        "num_lanes":     num_lanes,
-        "num_signals":   num_signals,
-        "hour":          hour,
-        "day_of_week":   dow_num,
-        "traffic_level": traffic_level,
-        "road_type":     road_type,
-        "weather_type":  weather_type,
-        "temperature_c": temperature_c,
+    input_df = build_input_df(inputs)
+    pred_minutes = predict(model, input_df, use_log_transform=USE_LOG_TRANSFORM)
+    st.session_state[_RESULT_KEY] = {
+        "request_id":   request_id,
+        "pred_minutes": pred_minutes,
+        # to_json converts numpy scalars to plain JSON types
+        "input_row":    json.loads(input_df.to_json(orient="records"))[0],
     }
+    return True
 
-    input_df  = build_input_df(user_inputs)
-    pred_time = predict(model, input_df, use_log_transform=USE_LOG_TRANSFORM)
 
-    st.divider()
-    st.subheader("🎯 Prediction Result")
+# A value set in the browser is already in session state when the rerun starts,
+# so the prediction is ready before the component is rendered in this run.
+handle_request(st.session_state.get(_UI_KEY))
 
-    res_col1, res_col2, res_col3 = st.columns([2, 1, 1])
+ui_value = deliveriq_ui(
+    metrics=metrics,
+    feature_importance=feat_imp.head(15)[["feature", "importance"]].to_dict("records"),
+    result=st.session_state.get(_RESULT_KEY),
+    key=_UI_KEY,
+    default=None,
+)
 
-    with res_col1:
-        st.success(
-            f"### ⏱️ Estimated Travel Time: **{pred_time:.1f} minutes**",
-            icon="✅",
-        )
-        hrs, mins = divmod(int(round(pred_time)), 60)
-        if hrs > 0:
-            st.caption(f"≈ {hrs} hr {mins} min")
-
-    with res_col2:
-        st.metric("MAE uncertainty (±)", f"{metrics.get('MAE', 0):.2f} min")
-
-    with res_col3:
-        st.metric("Avg speed assumed", f"{avg_spd:.0f} km/h")
-
-    # — Input echo table —
-    with st.expander("📋 Input Summary", expanded=False):
-        echo_df = input_df.T.rename(columns={0: "Value"})
-        echo_df.index.name = "Feature"
-        st.dataframe(echo_df, use_container_width=True)
-
-    st.divider()
-
-    # ─────────────────────────────────────────────────────────
-    # 8.  Feature importance chart  (Sprint 5.33)
-    # ─────────────────────────────────────────────────────────
-    with st.expander("📊 Feature Importance (Top 15)", expanded=True):
-        top15 = feat_imp.head(15).copy()
-        top15["importance_pct"] = top15["importance"] * 100
-
-        fig = px.bar(
-            top15.sort_values("importance_pct"),
-            x="importance_pct",
-            y="feature",
-            orientation="h",
-            labels={"importance_pct": "Importance (%)", "feature": "Feature"},
-            title="Random Forest — Feature Importances (Top 15)",
-            color="importance_pct",
-            color_continuous_scale="Blues",
-            text=top15.sort_values("importance_pct")["importance_pct"].apply(
-                lambda v: f"{v:.1f}%"
-            ),
-        )
-        fig.update_traces(textposition="outside")
-        fig.update_layout(
-            coloraxis_showscale=False,
-            yaxis_title="",
-            xaxis_title="Mean Decrease in Impurity (%)",
-            height=520,
-            margin=dict(l=10, r=40, t=50, b=40),
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption(
-            "`distance_km` dominates at ~65% — consistent with how `travel_time_min` "
-            "was generated. `num_signals` and `avg_speed_kmph` are next most informative."
-        )
+# Fallback for the case where the value only shows up as the return value.
+if handle_request(ui_value):
+    st.rerun()

@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeliverIQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<!-- Markup and inline styles are translated from design_reference/Landing.dc.html
+     and Predict.dc.html. Every value marked data-bind or filled by app.js comes
+     from the args Streamlit sends (models/metrics.json, feature_importance.csv,
+     and the model's prediction). --pvh is 1% of the host page's viewport height,
+     standing in for the prototype's vh units, which would otherwise track the
+     iframe's own (content-sized) height. -->
+<div id="app" hidden style="min-height: calc(var(--pvh, 8px) * 100); background: #0B1220; color: #E8EDF6; font-family: Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+
+<!-- ═══════════════════════ Screen 1: Landing ═══════════════════════ -->
+<div id="screen-landing">
+
+<header style="border-bottom: 1px solid #1E2A42; background: #0E1627">
+<div style="max-width: 1280px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px">
+<div style="display: flex; align-items: center; gap: 12px">
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="8" stroke="#F5B83D" stroke-width="2"/><circle cx="10" cy="25" r="3" fill="#F5B83D"/><circle cx="26" cy="11" r="3" stroke="#F5B83D" stroke-width="2"/><path d="M12 23c6-1 2-10 11-11" stroke="#F5B83D" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 4"/></svg>
+<div style="display: flex; flex-direction: column">
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.01em">DeliverIQ</span>
+<span style="font-size: 12px; color: #9AA8C0">Delivery ETA Predictor</span>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<span style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid #22304A; border-radius: 999px; font-size: 12px; color: #C9D3E6"><span style="width: 8px; height: 8px; border-radius: 50%; background: #7CE3A1; animation: pulse 2.4s ease-in-out infinite"></span>Model loaded <span data-bind="modelName" style="font-family: 'JetBrains Mono', monospace; color: #E8EDF6"></span></span>
+<button type="button" class="cta" data-nav="predict" style="display: flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; background: #F5B83D; color: #1A1405; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 14px; text-decoration: none">Try a prediction</button>
+</div>
+</div>
+</header>
+
+<div style="max-width: 1280px; margin: 0 auto; padding: 56px 24px 36px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; animation: rise .6s ease-out both">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #F5B83D">Delivery ETA Predictor</span>
+<h1 id="h-landing" tabindex="-1" style="margin: 0; max-width: 860px; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: clamp(34px, 5.4vw, 60px); line-height: 1.03; letter-spacing: -0.02em; text-wrap: balance; outline: none">Know the minutes before the van leaves.</h1>
+<p style="margin: 0; max-width: 680px; font-size: 18px; color: #B4C0D6; text-wrap: pretty">DeliverIQ predicts urban delivery travel time in minutes from the distance, the road, the traffic, the weather and the hour of departure.</p>
+<button type="button" class="cta" data-nav="predict" style="margin-top: 8px; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 28px; border-radius: 12px; background: #F5B83D; color: #1A1405; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 18px; text-decoration: none">Try a prediction<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h13M11 5l5 5-5 5" stroke="#1A1405" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</div>
+
+<div id="scene" style="position: relative; height: 380px; border-top: 1px solid #1E2A42; border-bottom: 1px solid #1E2A42; overflow: hidden; background: #0A1222; transition: background 1s" role="img" aria-label="">
+
+<div id="orb" style="position: absolute; width: 38px; height: 38px; border-radius: 50%; transition: left 1s, top 1s, background 1s"></div>
+
+<div id="scenery" style="display: contents"></div>
+<div id="rail" hidden style="position: absolute; left: 0; right: 0; height: 3px; background: #4A5C7E"></div>
+
+<div id="ground" style="position: absolute; left: 0; right: 0; bottom: 0; background: #0D1525; transition: top .5s"></div>
+
+<div id="signals" style="display: contents"></div>
+
+<div id="road" style="position: absolute; left: 6%; background: #2A3550; border-top: 2px solid #55678A; border-bottom: 2px solid #55678A; box-sizing: border-box; overflow: hidden; transition: width .7s, top .5s, height .5s">
+<div id="lanes" style="display: contents"></div>
+<div id="vehicles" style="display: contents"></div>
+<div id="trail" style="position: absolute; left: 0; bottom: 0; height: 4px; background: #F5B83D"></div>
+</div>
+
+<div id="pin-start" style="position: absolute; left: 6%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; transition: top .5s">
+<div style="width: 2px; height: 10px; background: #9AA8C0"></div>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #C9D3E6; white-space: nowrap; padding-left: 28px">Depot · 0 km</span>
+</div>
+<div id="pin-end" style="position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; transition: left .7s, top .5s">
+<div style="width: 2px; height: 10px; background: #F5B83D"></div>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #F5B83D; white-space: nowrap">Drop-off · <span id="pin-end-km"></span> km</span>
+</div>
+
+<div id="truck-lane" style="position: absolute; left: 6%; height: 0; transition: width .7s, top .5s">
+<div id="truck-run" style="position: absolute; top: 0">
+<div style="animation: bobLanding .35s ease-in-out infinite; transform: translate(-50%, -50%)">
+<svg width="52" height="30" viewBox="0 0 46 26" fill="none" aria-hidden="true"><rect x="1" y="3" width="27" height="16" rx="2" fill="#F5B83D"/><path d="M28 8h9l7 6v5H28V8z" fill="#FFD27A"/><rect x="33" y="10" width="6" height="4" fill="#0B1220"/><circle cx="10" cy="20" r="4" fill="#0B1220" stroke="#E8EDF6" stroke-width="2"/><circle cx="36" cy="20" r="4" fill="#0B1220" stroke="#E8EDF6" stroke-width="2"/></svg>
+</div>
+</div>
+</div>
+
+<div id="rain" hidden style="position: absolute; inset: 0; background-image: repeating-linear-gradient(105deg, transparent 0 18px, rgba(170,205,240,.38) 18px 19px); background-size: 40px 160px; animation: rain .7s linear infinite; pointer-events: none"></div>
+<div id="fog" hidden style="display: contents">
+<div style="position: absolute; inset: 0; background: rgba(196,206,222,.34); pointer-events: none"></div>
+<div style="position: absolute; left: -10%; right: -10%; top: 110px; height: 130px; border-radius: 50%; background: rgba(214,222,236,.5); filter: blur(28px); animation: fogdrift 9s ease-in-out infinite alternate; pointer-events: none"></div>
+<div style="position: absolute; left: -10%; right: -10%; top: 200px; height: 100px; border-radius: 50%; background: rgba(214,222,236,.42); filter: blur(24px); animation: fogdrift 13s ease-in-out infinite alternate-reverse; pointer-events: none"></div>
+</div>
+
+<div style="position: absolute; left: 0; right: 0; top: 14px">
+<div style="max-width: 1280px; margin: 0 auto; padding: 0 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px">
+<div id="chips" style="display: flex; flex-wrap: wrap; gap: 6px"></div>
+<div id="scenarios" role="group" aria-label="Example routes" style="display: flex; flex-wrap: wrap; gap: 6px"></div>
+</div>
+</div>
+</div>
+
+<main style="max-width: 1280px; margin: 0 auto; padding: 48px 24px 64px; display: flex; flex-direction: column; gap: 32px">
+
+<section aria-labelledby="h-metrics" style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 id="h-metrics" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 600; letter-spacing: -0.01em">Test-Set Metrics</h2>
+<span style="font-size: 14px; color: #9AA8C0">Measured on <span data-bind="testRows"></span> trips the model never saw during training.</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px">
+<div style="padding: 20px; border-radius: 14px; background: #111A2C; border: 1px solid #F5B83D; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; color: #9AA8C0">MAE</span><span data-bind="mae" style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 38px; font-weight: 700; color: #F5B83D; line-height: 1.1"></span><span style="font-size: 12px; color: #9AA8C0">Typical miss, in minutes</span></div>
+<div style="padding: 20px; border-radius: 14px; background: #111A2C; border: 1px solid #1E2A42; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; color: #9AA8C0">RMSE</span><span data-bind="rmse" style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 38px; font-weight: 700; line-height: 1.1"></span><span style="font-size: 12px; color: #9AA8C0">Penalises the rare large misses</span></div>
+<div style="padding: 20px; border-radius: 14px; background: #111A2C; border: 1px solid #1E2A42; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; color: #9AA8C0">R²</span><span data-bind="r2" style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 38px; font-weight: 700; line-height: 1.1"></span><span style="font-size: 12px; color: #9AA8C0">Share of variance explained</span></div>
+<div style="padding: 20px; border-radius: 14px; background: #111A2C; border: 1px solid #1E2A42; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; color: #9AA8C0">MAPE</span><span data-bind="mape" style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 38px; font-weight: 700; line-height: 1.1"></span><span style="font-size: 12px; color: #9AA8C0">Typical miss, as a share of trip time</span></div>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: stretch">
+
+<section aria-labelledby="h-card" style="flex: 1 1 340px; min-width: 0; background: #111A2C; border: 1px solid #1E2A42; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+<h2 id="h-card" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 20px; font-weight: 600">Model Card</h2>
+<div style="display: flex; flex-direction: column; font-size: 14px">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1E2A42"><span style="color: #9AA8C0">Model</span><span data-bind="modelName" style="font-family: 'JetBrains Mono', monospace; font-size: 13px"></span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1E2A42"><span style="color: #9AA8C0">Train rows</span><span data-bind="trainRows" style="font-family: 'JetBrains Mono', monospace; font-size: 13px"></span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1E2A42"><span style="color: #9AA8C0">Test rows</span><span data-bind="testRows" style="font-family: 'JetBrains Mono', monospace; font-size: 13px"></span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 0"><span style="color: #9AA8C0">Log-transform</span><span data-bind="logTransform" style="font-family: 'JetBrains Mono', monospace; font-size: 13px"></span></div>
+</div>
+</section>
+
+<section aria-labelledby="h-base" style="flex: 1 1 340px; min-width: 0; background: #111A2C; border: 1px solid #1E2A42; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 18px">
+<h2 id="h-base" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 20px; font-weight: 600">Baseline Comparison</h2>
+<div style="display: grid; grid-template-columns: 6rem minmax(0, 1fr) 5.2rem; align-items: center; gap: 14px 10px; font-size: 13px">
+<span style="color: #C9D3E6">Baseline MAE</span>
+<div style="height: 18px; border-radius: 4px; background: #172238"><div style="height: 100%; width: 100%; border-radius: 4px; background: #6F7F9C; transform-origin: left; animation: grow 1s .2s ease-out both"></div></div>
+<span data-bind="baselineMae" style="font-family: 'JetBrains Mono', monospace; text-align: right"></span>
+<span style="color: #C9D3E6">This model</span>
+<div style="height: 18px; border-radius: 4px; background: #172238"><div id="model-bar" style="height: 100%; width: 0; border-radius: 4px; background: #F5B83D; transform-origin: left; animation: grow 1s .4s ease-out both"></div></div>
+<span data-bind="mae" style="font-family: 'JetBrains Mono', monospace; text-align: right"></span>
+</div>
+<div style="display: flex; align-items: baseline; gap: 10px"><span data-bind="improvement" style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 38px; font-weight: 700; color: #F5B83D; line-height: 1"></span><span style="font-size: 14px; color: #B4C0D6">error vs baseline</span></div>
+</section>
+
+<section aria-labelledby="h-params" style="flex: 1 1 340px; min-width: 0; background: #111A2C; border: 1px solid #1E2A42; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+<h2 id="h-params" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 20px; font-weight: 600">Best Params</h2>
+<div id="params" style="display: flex; flex-direction: column; font-family: 'JetBrains Mono', monospace; font-size: 12px"></div>
+</section>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; padding: 28px; border-radius: 14px; border: 1px dashed #34486B">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 24px; font-weight: 600">Have a route in mind?</span>
+<span style="font-size: 14px; color: #B4C0D6">Enter nine route details and get an estimate in minutes, with its error range.</span>
+</div>
+<button type="button" class="cta" data-nav="predict" style="display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 28px; border-radius: 12px; background: #F5B83D; color: #1A1405; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 18px; text-decoration: none">Try a prediction<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h13M11 5l5 5-5 5" stroke="#1A1405" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</div>
+
+<footer style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding-top: 20px; border-top: 1px solid #1E2A42; font-size: 13px; color: #9AA8C0">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 1.5l6 2.2v4.6c0 3.7-2.5 6.9-6 8.2-3.5-1.3-6-4.5-6-8.2V3.7l6-2.2z" stroke="#7CE3A1" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 9l2.2 2.2L12.2 7" stroke="#7CE3A1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<span>Nothing you enter is stored. Every number on this page comes from the model's saved test results.</span>
+</footer>
+</main>
+</div>
+
+<!-- ═══════════════════════ Screen 2: Predict ═══════════════════════ -->
+<div id="screen-predict" hidden>
+
+<header style="border-bottom: 1px solid #1E2A42; background: #0E1627">
+<div style="max-width: 1280px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px">
+<div style="display: flex; align-items: center; gap: 12px">
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="8" stroke="#F5B83D" stroke-width="2"/><circle cx="10" cy="25" r="3" fill="#F5B83D"/><circle cx="26" cy="11" r="3" stroke="#F5B83D" stroke-width="2"/><path d="M12 23c6-1 2-10 11-11" stroke="#F5B83D" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 4"/></svg>
+<div style="display: flex; flex-direction: column">
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.01em">DeliverIQ</span>
+<span style="font-size: 12px; color: #9AA8C0">Delivery ETA Predictor</span>
+</div>
+</div>
+<a href="#landing" data-nav="landing" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid #2A3A58; border-radius: 10px; font-size: 14px; text-decoration: none"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17 10H4M9 5l-5 5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Model card and metrics</a>
+</div>
+</header>
+
+<div id="loader" role="status" style="min-height: calc(var(--pvh, 8px) * 78); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 24px">
+<div style="position: relative; width: min(420px, 80vw); height: 60px">
+<div style="position: absolute; left: 0; right: 0; top: 40px; height: 4px; border-radius: 2px; background-image: repeating-linear-gradient(90deg, #34486B 0 12px, transparent 12px 24px); animation: dash .5s linear infinite"></div>
+<div style="position: absolute; left: 0; top: 40px; height: 4px; border-radius: 2px; background: #F5B83D; animation: loadFill 1.6s cubic-bezier(.4,0,.2,1) both"></div>
+<div style="position: absolute; top: 30px; animation: loadTruck 1.6s cubic-bezier(.4,0,.2,1) both">
+<div style="animation: bob .3s ease-in-out infinite; transform: translate(-50%, -50%)">
+<svg width="46" height="26" viewBox="0 0 46 26" fill="none" aria-hidden="true"><rect x="1" y="3" width="27" height="16" rx="2" fill="#F5B83D"/><path d="M28 8h9l7 6v5H28V8z" fill="#FFD27A"/><rect x="33" y="10" width="6" height="4" fill="#0B1220"/><circle cx="10" cy="20" r="4" fill="#0B1220" stroke="#E8EDF6" stroke-width="2"/><circle cx="36" cy="20" r="4" fill="#0B1220" stroke="#E8EDF6" stroke-width="2"/></svg>
+</div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; font-weight: 600">Loading model…</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9AA8C0"><span data-bind="modelName"></span> · <span data-bind="trees"></span> trees</span>
+</div>
+</div>
+
+<main id="predict-main" hidden style="max-width: 1280px; margin: 0 auto; padding: 36px 24px 64px; display: flex; flex-direction: column; gap: 24px">
+
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px; animation: rise .5s ease-out both">
+<div style="display: flex; flex-direction: column; gap: 6px; max-width: 640px">
+<h1 id="h-predict" tabindex="-1" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: clamp(28px, 4vw, 40px); line-height: 1.08; letter-spacing: -0.02em; outline: none">Route Details</h1>
+<p style="margin: 0; color: #B4C0D6">Fill in the route details below and press Predict Travel Time to get an estimated delivery duration in minutes.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span id="l-presets" style="font-size: 12px; color: #9AA8C0">Start from a scenario</span>
+<div id="presets" role="group" aria-labelledby="l-presets" style="display: flex; flex-wrap: wrap; gap: 8px"></div>
+</div>
+</div>
+
+<section aria-label="Route details" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; align-items: stretch">
+
+<div style="background: #111A2C; border: 1px solid #1E2A42; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px; animation: rise .5s .05s ease-out both">
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #F5B83D">01</span>Road</h2>
+
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px"><label for="f-distance" style="font-weight: 500">Distance (km)</label><span id="v-distance" style="font-family: 'JetBrains Mono', monospace; color: #F5B83D"></span></div>
+<input id="f-distance" type="range" min="1" max="100" step="0.5" value="15">
+<span style="font-size: 12px; color: #8E9CB6">Origin-to-destination straight-line distance.</span>
+</div>
+
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px"><label for="f-lanes" style="font-weight: 500">Number of Lanes</label><span id="v-lanes" style="font-family: 'JetBrains Mono', monospace; color: #F5B83D"></span></div>
+<input id="f-lanes" type="range" min="1" max="8" step="1" value="2">
+<span style="font-size: 12px; color: #8E9CB6">Lane count on the primary road segment.</span>
+</div>
+
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px"><label for="f-signals" style="font-weight: 500">Number of Signals</label><span id="v-signals" style="font-family: 'JetBrains Mono', monospace; color: #F5B83D"></span></div>
+<input id="f-signals" type="range" min="0" max="30" step="1" value="5">
+<span style="font-size: 12px; color: #8E9CB6">Traffic signals along the route.</span>
+</div>
+</div>
+
+<div style="background: #111A2C; border: 1px solid #1E2A42; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px; animation: rise .5s .12s ease-out both">
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #F5B83D">02</span>Conditions</h2>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span id="l-road" style="font-weight: 500">Road Type</span>
+<div id="seg-road" role="group" aria-labelledby="l-road" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px"></div>
+<span style="font-size: 12px; color: #8E9CB6">Dominant road type on the route.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span id="l-traffic" style="font-weight: 500">Traffic Level</span>
+<div id="seg-traffic" role="group" aria-labelledby="l-traffic" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px"></div>
+<span style="font-size: 12px; color: #8E9CB6">Observed congestion level. Avg speed derived: low 60 km/h · medium 35 km/h · high 20 km/h.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span id="l-weather" style="font-weight: 500">Weather Condition</span>
+<div id="seg-weather" role="group" aria-labelledby="l-weather" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px"></div>
+<span style="font-size: 12px; color: #8E9CB6">Current weather along the route. Visibility derived: clear 10 km · rain 4 km · fog 1.5 km.</span>
+</div>
+</div>
+
+<div style="background: #111A2C; border: 1px solid #1E2A42; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px; animation: rise .5s .19s ease-out both">
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #F5B83D">03</span>Departure</h2>
+
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px"><label for="f-hour" style="font-weight: 500">Departure Hour (24h)</label><span id="v-hour" style="font-family: 'JetBrains Mono', monospace; color: #F5B83D"></span></div>
+<input id="f-hour" type="range" min="0" max="23" step="1" value="9">
+<div aria-hidden="true" style="position: relative; height: 6px; border-radius: 3px; background: #1B2740; margin: 0 8px">
+<div style="position: absolute; left: 28.3%; width: 8.7%; top: 0; bottom: 0; border-radius: 3px; background: #F5B83D"></div>
+<div style="position: absolute; left: 71.7%; width: 8.7%; top: 0; bottom: 0; border-radius: 3px; background: #F5B83D"></div>
+</div>
+<span style="font-size: 12px; color: #8E9CB6; margin-top: 8px">Hour of departure (0 = midnight, 17 = 5 PM). Amber bands mark rush hours: 7, 8, 17, 18.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span id="l-day" style="font-weight: 500">Day of Week</span>
+<div id="seg-day" role="group" aria-labelledby="l-day" style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px"></div>
+<span style="font-size: 12px; color: #8E9CB6">Mon–Fri = weekday (0–4) · Sat–Sun = weekend (5–6).</span>
+</div>
+
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px"><label for="f-temp" style="font-weight: 500">Temperature (°C)</label><span id="v-temp" style="font-family: 'JetBrains Mono', monospace; color: #F5B83D"></span></div>
+<input id="f-temp" type="range" min="-5" max="50" step="0.5" value="28">
+<span style="font-size: 12px; color: #8E9CB6">Ambient temperature. Default 28°C (typical Delhi).</span>
+</div>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 10px">
+<div id="badge-rush" style="padding: 12px 14px; border-radius: 10px; border: 1px solid #1E2A42; background: #111A2C; display: flex; flex-direction: column; gap: 2px; transition: border-color .3s"><span style="font-size: 11px; color: #9AA8C0; text-transform: uppercase; letter-spacing: 0.08em">Time window</span><span id="badge-rush-label" style="font-weight: 600"></span></div>
+<div style="padding: 12px 14px; border-radius: 10px; border: 1px solid #1E2A42; background: #111A2C; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #9AA8C0; text-transform: uppercase; letter-spacing: 0.08em">Day type</span><span id="badge-day" style="font-weight: 600"></span></div>
+<div style="padding: 12px 14px; border-radius: 10px; border: 1px solid #1E2A42; background: #111A2C; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #9AA8C0; text-transform: uppercase; letter-spacing: 0.08em">Avg speed</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace"><span data-bind="speed"></span> km/h</span></div>
+<div style="padding: 12px 14px; border-radius: 10px; border: 1px solid #1E2A42; background: #111A2C; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #9AA8C0; text-transform: uppercase; letter-spacing: 0.08em">Visibility</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace"><span id="badge-vis"></span> km</span></div>
+</div>
+
+<button id="go" type="button" class="go" style="min-height: 56px; border: 0; border-radius: 12px; background: #F5B83D; color: #1A1405; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; transition: background .2s">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h13M11 5l5 5-5 5" stroke="#1A1405" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="go-label">Predict Travel Time</span></button>
+
+<section id="result" aria-label="Prediction Result" aria-live="polite" style="background: #111A2C; border: 1px solid #1E2A42; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 22px; transition: border-color .4s">
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 20px; font-weight: 600">Prediction Result</h2>
+
+<div aria-hidden="true" style="position: relative; height: 64px; margin: 0 26px">
+<div style="position: absolute; left: 0; right: 0; top: 30px; height: 6px; border-radius: 3px; background: #1B2740"></div>
+<div id="track-trail" style="position: absolute; left: 0; top: 30px; height: 6px; border-radius: 3px; background: #F5B83D; width: 0.0%"></div>
+<div id="track-signals" style="display: contents"></div>
+<div id="track-truck" style="position: absolute; left: 0.00%; top: 22px; transform: translate(-50%, -50%); animation: none">
+<svg width="46" height="26" viewBox="0 0 46 26" fill="none"><rect x="1" y="3" width="27" height="16" rx="2" fill="#F5B83D"/><path d="M28 8h9l7 6v5H28V8z" fill="#FFD27A"/><rect x="33" y="10" width="6" height="4" fill="#0B1220"/><circle cx="10" cy="20" r="4" fill="#0B1220" stroke="#E8EDF6" stroke-width="2"/><circle cx="36" cy="20" r="4" fill="#0B1220" stroke="#E8EDF6" stroke-width="2"/></svg>
+</div>
+<span style="position: absolute; left: 0; top: 44px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #C9D3E6">Depot</span>
+<span style="position: absolute; right: 0; top: 44px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #F5B83D">Drop-off · <span id="track-km"></span> km</span>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 12px; color: #9AA8C0; text-transform: uppercase; letter-spacing: 0.1em">Estimated Travel Time</span>
+<div style="display: flex; align-items: baseline; gap: 10px">
+<span id="eta" style="font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: clamp(56px, 9vw, 88px); line-height: 1; letter-spacing: -0.03em; color: #55678A; font-variant-numeric: tabular-nums">––.–</span>
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 22px; color: #B4C0D6">minutes</span>
+</div>
+<span id="eta-sub" style="font-size: 14px; color: #B4C0D6"></span>
+</div>
+<div style="display: flex; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #9AA8C0">MAE uncertainty (±)</span><span data-bind="mae" style="font-family: 'JetBrains Mono', monospace; font-size: 20px"></span></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #9AA8C0">Avg speed assumed</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 20px"><span data-bind="speed"></span> km/h</span></div>
+</div>
+</div>
+
+<div id="range" hidden style="display: flex; flex-direction: column; gap: 8px; animation: rise .5s ease-out both">
+<div aria-hidden="true" style="position: relative; height: 12px; border-radius: 6px; background: #1B2740">
+<div style="position: absolute; left: 30%; width: 40%; top: 0; bottom: 0; border-radius: 6px; background: #2E6E86; transform-origin: center; animation: grow .7s ease-out both"></div>
+<div style="position: absolute; left: 50%; top: -5px; width: 4px; height: 22px; margin-left: -2px; border-radius: 2px; background: #F5B83D"></div>
+</div>
+<div style="display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C9D3E6"><span><span id="range-low"></span> min</span><span style="color: #F5B83D"><span id="range-pred"></span> min</span><span><span id="range-high"></span> min</span></div>
+<span style="font-size: 13px; color: #B4C0D6">The shaded band is the model's typical miss on unseen trips (mean absolute error, <span data-bind="mae"></span> either way). Treat the estimate as a range, not a promise.</span>
+</div>
+
+<div id="stale" hidden style="padding: 10px 14px; border: 1px solid #F5B83D; border-radius: 8px; font-size: 13px; color: #FFD27A">The route changed after this estimate. Press Predict Travel Time again to refresh it.</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<button id="summary-toggle" type="button" class="seg" aria-expanded="false" aria-controls="summary" style="align-self: flex-start; min-height: 44px; padding: 0 14px; border: 1px solid #2A3A58; border-radius: 8px; background: transparent; color: #C9D3E6; font-size: 13px">Show Input Summary</button>
+<div id="summary" hidden style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0 24px; animation: rise .35s ease-out both"></div>
+</div>
+</section>
+
+<section aria-labelledby="h-imp" style="background: #111A2C; border: 1px solid #1E2A42; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 id="h-imp" style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 20px; font-weight: 600">Feature Importance (Top 15)</h2>
+<span style="font-size: 13px; color: #9AA8C0">Random Forest, mean decrease in impurity (%)</span>
+</div>
+<div id="features" style="display: flex; flex-direction: column; gap: 8px"></div>
+<p id="features-caption" style="margin: 0; font-size: 13px; color: #B4C0D6"></p>
+</section>
+
+<footer style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding-top: 20px; border-top: 1px solid #1E2A42; font-size: 13px; color: #9AA8C0">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 1.5l6 2.2v4.6c0 3.7-2.5 6.9-6 8.2-3.5-1.3-6-4.5-6-8.2V3.7l6-2.2z" stroke="#7CE3A1" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 9l2.2 2.2L12.2 7" stroke="#7CE3A1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<span>Nothing you enter is stored. Each estimate is computed on request by the trained pipeline.</span>
+</footer>
+</main>
+</div>
+
+</div>
+</body>
+</html>

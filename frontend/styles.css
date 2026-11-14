@@ -1,0 +1,48 @@
+/* DeliverIQ UI. Merged from the <style> blocks of Landing.dc.html and
+   Predict.dc.html. Layout lives in inline styles in index.html, copied from
+   the prototype; this file holds the shared rules and keyframes. */
+
+html,body{margin:0;background:#0B1220}
+[hidden]{display:none!important}
+
+/* Link colours differ per screen in the prototype, so they are scoped. */
+#screen-landing a{color:#F5B83D}#screen-landing a:hover{color:#FFD27A}
+#screen-predict a{color:#C9D3E6}#screen-predict a:hover{color:#F5B83D}
+
+.cta{border:0}
+.cta:hover{color:#1A1405;background:#FFC95C!important}
+.cta:hover svg{transform:translateX(4px)}
+.cta svg{transition:transform .2s}
+
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #5CC8E8;outline-offset:2px}
+/* !important because these buttons carry inline border and background. */
+button.seg:hover{border-color:#F5B83D!important}
+button.go:hover:not(:disabled){background:#FFC95C!important}
+button.go:disabled{cursor:progress;opacity:.75}
+input[type=range]{accent-color:#F5B83D;width:100%;height:44px;margin:0;display:block;cursor:pointer}
+
+/* Landing scene */
+@keyframes drive{from{left:-6%}to{left:104%}}
+@keyframes truckA{from{left:0}to{left:100%}}
+@keyframes truckB{from{left:0}to{left:100%}}
+@keyframes trailA{from{width:0}to{width:100%}}
+@keyframes trailB{from{width:0}to{width:100%}}
+@keyframes rain{from{background-position:0 0}to{background-position:-40px 160px}}
+@keyframes fogdrift{from{transform:translateX(-8%)}to{transform:translateX(8%)}}
+/* The two prototypes define "bob" with different lifts; the landing one is renamed. */
+@keyframes bobLanding{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,-58%)}}
+
+/* Shared */
+@keyframes sig{0%,40%{background:#E5484D}41%,52%{background:#F5B83D}53%,100%{background:#7CE3A1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Predict */
+@keyframes bob{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,-62%)}}
+@keyframes loadTruck{from{left:0}to{left:100%}}
+@keyframes loadFill{from{width:0}to{width:100%}}
+@keyframes dash{to{background-position:-24px 0}}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
